@@ -17,13 +17,14 @@
 			canDrag : true,
 			canMultiple : true,
 			success: function (fileName) {
-				alert(fileName + '上传成功');
+			//	alert(fileName + '上传成功');
 			},
 			error: function (fileName) {
-				alert(fileName + '上传失败');
+			//	alert(fileName + '上传失败');
 			},
 			complete : function () {
-				alert('所有文件上传完毕');
+				alert('所有文件上传完毕，单击确定开始转换');
+          //      window.location.href="transform.php";
 			}
 		});
 	</script>

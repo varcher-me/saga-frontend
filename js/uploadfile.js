@@ -187,6 +187,8 @@
 					alert('请选择文件');
 					return;
 				}
+				uuid = guid();
+				console.log("uuid = " + uuid);
 				fileArr.forEach(function (item, i) {
 					var upLoadSuccess = $('.img_box').eq(i).children('.up_load_success');
 					
@@ -194,6 +196,9 @@
 					if(upLoadSuccess.css('display') === 'block') return false;   
 					var formData = new FormData();
 					formData.append('file', item);
+					formData.append('uuid', uuid);
+					formData.append('seq_no', i);
+					console.log("seq = " + i);
 					$.ajax({
 					    url: setting.url,
 					    type: 'POST',
@@ -248,3 +253,10 @@
 		})
 	}
 })(jQuery)
+
+function guid() {
+    return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        var r = Math.random()*16|0, v = c == 'x' ? r : (r&0x3|0x8);
+        return v.toString(16);
+    });
+}
