@@ -22,9 +22,9 @@
 			error: function (fileName) {
 			//	alert(fileName + '上传失败');
 			},
-			complete : function () {
-				alert('所有文件上传完毕，单击确定开始转换');
-          //      window.location.href="transform.php";
+			complete : function (uuid) {
+				alert('所有文件上传完毕，单击确定开始转换！批次号 = ' + uuid);
+                window.location.href="transform.php?uuid="+uuid;
 			}
 		});
 	</script>

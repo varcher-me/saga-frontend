@@ -10,7 +10,7 @@
 			},
 			error : function (fileName) {     //单个文件上传失败的回调函数
 			},
-			complete : function () {  //上传完成的回调函数
+			complete : function (uuid) {  //上传完成的回调函数
 			}
 		};
 
@@ -187,7 +187,7 @@
 					alert('请选择文件');
 					return;
 				}
-				uuid = guid();
+                var uuid = guid();
 				console.log("uuid = " + uuid);
 				fileArr.forEach(function (item, i) {
 					var upLoadSuccess = $('.img_box').eq(i).children('.up_load_success');
@@ -208,18 +208,19 @@
 					    contentType: false
 					}).done(function(res) {
 						//上传成功图标
+						alert(res);
 						upLoadSuccess.show();
 
 						//单个文件上传成功执行回调
 						setting.success(item.name);
 
 						//全部文件上传完成执行回调函数
-						(i === (fileArr.length - 1)) && setting.complete();
+						(i === (fileArr.length - 1)) && setting.complete(uuid);
 					}).fail(function(res) {
 						//单个文件上传失败执行回调
 						setting.error(item.name);
 
-						(i === (fileArr.length - 1)) && setting.complete();
+						(i === (fileArr.length - 1)) && setting.complete(uuid);
 					});
 				})
 			}

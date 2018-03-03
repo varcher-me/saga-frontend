@@ -24,11 +24,15 @@ $uuid               = $_REQUEST['uuid'];
 $seqNo              = $_REQUEST['seq_no'];
 $status             = 1;
 $appid              = "00";
-$userid             = "";
+$userid             = $_SERVER['REMOTE_ADDR'] ;
 $time_post          = date("Y-m-d H:i:s", time());
 $filename_post      = rawurldecode($fileName);
-$filename_safe      = urldecode($fileName);
+$filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $filename_post);
 $filename_server    = $fileAlias;
+
+if ($uuid == "") {
+    $uuid = $time_post;
+}
 
 try {
     $sql = "INSERT INTO history (uuid, seq_no, status, appid, userid, time_post, filename_post, filename_secure) VALUES
@@ -55,9 +59,10 @@ try {
 if($fileAlias){
     move_uploaded_file($fileAlias, "uploadfile/" . $fileName);
 }
-//    header('HTTP/1.1 500 66666');
+//    header('HTTP/1.1 500 66666'); todo: 返回值json化
 
 header('content-type:text/html;charset=utf-8');
 $logger->info( 'fileName: ' . $fileName . ', fileType: ' . $type . ', fileSize: ' . ($size / 1024) . 'KB');
 $logger->info(sprintf("UUID = %s SEQ = %s", $uuid, $seqNo));
+echo "HAHAHA UPLOAD SUCCESS";
 ?>
