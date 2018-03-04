@@ -1,55 +1,121 @@
 <?php
 include "log4php/Logger.php";
 include "Connector/MySQLiConnector.php";
+include "Connector/RedisConnector.php";
 
 define("__EXCEPTION_SUCCESS__", 0);
 define("__EXCEPTION_DBER__", 1);
 define("__EXCEPTION_FILE_ERROR__", 2);
+define("__EXCEPTION_FUNCTION_UNKNOWN__", 3);
+define("__EXCEPTION_USER_UNMATCH__", 4);
+define("__EXCEPTION_REDIS_ERR__", 4);
 define("__EXCEPTION_UNKNOWN__", 9999);
 
 date_default_timezone_set('PRC');
-ini_set("display_errors", "Off");
+ini_set("display_errors", "On");
 
 Logger::configure(dirname(__FILE__).'/logger.xml');
 $logger = Logger::getLogger('Saga');
+$dbConn = new MySQLiConnector();
 
-try {
-    $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret", "saga"); //todo 参数化
-    uploadFileCheck();
-    uploadFileMove("uploadfile/");   // todo:目标文件夹改为参数
-    insertHistory();
-} catch (Exception $e) {
-    $logger->error($e->getMessage());
-    $logger->error($e->getTraceAsString());
+$function = $_REQUEST['function'];
+
+switch ($function) {
+    case "singleUpload":
+        $retMsg = singleUpload();
+        break;
+    case "transform":
+        $retMsg = transform();
+        break;
+    default:
+        $retMsg = buildReturnMsg(__EXCEPTION_FUNCTION_UNKNOWN__, "CALL_FUNCTION_UNKNOWN");
+        $logMsg = sprintf("Unknown Call Function %s From IP:[%s]", $function, $_SERVER['REMOTE_ADDR']);
+        $logger->warn($logMsg);
+        $retMsg = "Unknown Call Function, operation has been logged.";
+        break;
+}
+echo $retMsg;
+
+function singleUpload()
+{
+    global $logger;
+    global $dbConn;
+    try {
+        $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret", "saga"); //todo 参数化
+        uploadFileCheck();
+        uploadFileMove("uploadfile/");   // todo:目标文件夹改为参数
+        insertHistory();
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
 //    throw $e;
-} finally {
-    $returnArray = array();
-    if (isset($e)) {
-        $returnArray['returnCode'] = $e->getCode() > 0 ? $e->getCode(): __EXCEPTION_UNKNOWN__;
-        $returnArray['returnMsg']  = $e->getMessage();
-    } else {
-        $returnArray['returnCode'] = __EXCEPTION_SUCCESS__;
-        $returnArray['returnMsg']  = "SUCCESSFULLY";
-    }
-    $return = json_encode($returnArray);
+    } finally {
+        if (isset($e)) {
+            $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
+            $returnMsg  = $e->getMessage();
+        } else {
+            $returnCode = __EXCEPTION_SUCCESS__;
+            $returnMsg  = "SUCCESSFULLY";
+        }
 
-    $fileName   = $_FILES['file']['name'];
-    $type       = $_FILES['file']['type'];
-    $size       = $_FILES['file']['size'] / 1048576;
-    $uuid       = $_REQUEST['uuid'];
-    $seqNo      = $_REQUEST['seq_no'];
-    $logMsg     = sprintf("UUID=%s, SEQ=%s, filename=%s, type=%s, size=%.1f MB, ReturnCode=%d, ReturnMsg=%s",
-                                  $uuid,   $seqNo, $fileName,   $type,   $size,      $returnArray['returnCode'], $returnArray['returnMsg']);
-    $logger->info($logMsg);
-    echo $return;
+        $fileName   = $_FILES['file']['name'];
+        $type       = $_FILES['file']['type'];
+        $size       = $_FILES['file']['size'] / 1048576;
+        $uuid       = $_REQUEST['uuid'];
+        $seqNo      = $_REQUEST['seq_no'];
+        $logMsg     = sprintf("UUID=%s, SEQ=%s, filename=%s, type=%s, size=%.1f MB, ReturnCode=%d, ReturnMsg=%s",
+                                      $uuid,   $seqNo, $fileName,   $type,   $size,        $returnCode,   $returnMsg);
+        $logger->info($logMsg);
+        return buildReturnMsg($returnCode, $returnMsg);
+    }
 }
 
+function transform()
+{
+    global $logger;
+    global $dbConn;
+    try {
+        $uuid = $_REQUEST['uuid'];
+        $userId = $_SERVER['REMOTE_ADDR'];
+        $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret", "saga"); //todo 参数化
+        if (!verifyUserByUUID($uuid, $userId)) {
+            $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
+            throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
+        }
+        try {
+            $redis = new RedisConnector("127.0.0.1", "6379", "");   //todo 参数化
+            $redis->selectDB(2);    //todo 参数化
+            $redis->rpush("QUEUE_INITIAL", $uuid);
+            //todo 增加防重复提交处理
+        } catch (Exception $e) {
+            $logger->error($e->getMessage());
+            $logger->error($e->getTraceAsString());
+            throw new Exception("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
+        }
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+    } finally {
+        if (isset($e)) {
+            $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
+            $returnMsg  = $e->getMessage();
+        } else {
+            $returnCode = __EXCEPTION_SUCCESS__;
+            $returnMsg  = "SUCCESSFULLY";
+        }
+
+        $logger->info("Transforming job pushed into initial Q for UUID {$uuid}");
+        return buildReturnMsg($returnCode, $returnMsg);
+    }
+
+}
 
 function createDbConn($host, $port, $user, $password, $db)
 {
     global $logger;
+    global $dbConn;
     try {
-        $dbConn = new MySQLiConnector($host, $port, $user, $password, $db);
+        $dbConn->connect($host, $port, $user, $password, $db);
         return $dbConn;
     } catch (Exception $e) {
         $logger->error($e->getMessage());
@@ -110,7 +176,6 @@ function insertHistory()
     }
 }
 
-
 function getUploadErrorMsg(int $errorNo): string
 {
     static $error = array(
@@ -127,6 +192,31 @@ function getUploadErrorMsg(int $errorNo): string
     }
     else {
         return $error[$errorNo];
+    }
+}
+
+function buildReturnMsg(int $returnCode, string $returnMsg): String
+{
+    $returnArray['returnCode'] = $returnCode;
+    $returnArray['returnMsg']  = $returnMsg;
+    return json_encode($returnArray);
+}
+
+function verifyUserByUUID(string $uuid, string $inUser):bool
+{
+    global $dbConn;
+    global $logger;
+
+    try {
+        $sql = "SELECT userid FROM history WHERE uuid = ? LIMIT 1";
+        $stmt = $dbConn->select($sql, 's', $uuid);
+        $stmt->bind_result($userId);
+        $stmt->fetch();
+        return $userId == $inUser;
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+        throw new Exception("SELECT Failed.", __EXCEPTION_DBER__);
     }
 }
 ?>

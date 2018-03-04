@@ -8,9 +8,12 @@
 
 class MySQLiConnector
 {
+    /**
+     * @var mysqli $conn MYSQL数据库连接
+     */
     private $conn = null;
 
-    public function __construct($host, $port, $user, $password, $db)
+    public function connect($host, $port, $user, $password, $db)
     {
         $this->conn = mysqli_connect($host, $user, $password, $db, $port);
         if (!$this->conn) {
@@ -43,6 +46,23 @@ class MySQLiConnector
             throw new Exception(sprintf("execute for SQL %s failed, errno = %d, errmsg = %s",
                 $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
         }
+    }
+
+    public function select($stmt, $type, ...$param):mysqli_stmt
+    {
+        if (!$bind = $this->conn->prepare($stmt)) {
+            throw new Exception(sprintf("prepare for SQL %s failed, errno = %d, errmsg = %s",
+                $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
+        }
+        if (!$bind->bind_param($type, ...$param)) {
+            throw new Exception(sprintf("bind for SQL %s failed, errno = %d, errmsg = %s",
+                $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
+        }
+        if (!$bind->execute()) {
+            throw new Exception(sprintf("execute for SQL %s failed, errno = %d, errmsg = %s",
+                $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
+        }
+        return $bind;
     }
 
 }

@@ -205,6 +205,7 @@
 					formData.append('file', item);
 					formData.append('uuid', uuid);
 					formData.append('seq_no', i);
+					formData.append('function', 'singleUpload');
 					console.log("seq = " + i);
 					$.ajax({
 					    url: setting.url,
