@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<configuration xmlns="http://logging.apache.org/log4php/">
+
+    <!--<appender name="NormalLogAppender" class="LoggerAppenderDailyFile">-->
+        <!--<param name="file" value="/var/log/saga/log-%s.log" />-->
+        <!--<param name="datePattern" value="Y-m-d" />-->
+        <!--<layout class="LoggerLayoutPattern">-->
+            <!--<param name="conversionPattern" value="%date{Y-m-d H:i:s} [%level] %message%newline" />-->
+        <!--</layout>-->
+    <!--</appender>-->
+
+    <!--<appender name="EventLogAppender" class="LoggerAppenderDailyFile">-->
+        <!--<param name="file" value="/var/log/saga/event-%s.log" />-->
+        <!--<param name="datePattern" value="Y-m-d" />-->
+        <!--<layout class="LoggerLayoutPattern">-->
+            <!--<param name="conversionPattern" value="%date{Y-m-d H:i:s} [%level] %message%newline" />-->
+        <!--</layout>-->
+    <!--</appender>-->
+
+    <appender name="SagaLogAppender" class="LoggerAppenderDailyFile">
+        <param name="file" value="log/saga/saga-frontend-%s.log" />
+        <param name="datePattern" value="Y-m-d" />
+        <layout class="LoggerLayoutPattern">
+            <param name="conversionPattern" value="%date{Y-m-d H:i:s} [%level] %message%newline" />
+        </layout>
+    </appender>
+
+    <logger name="Saga">
+        <appender_ref ref="SagaLogAppender" />
+    </logger>
+
+    <!--<logger name="event">-->
+        <!--<appender_ref ref="EventLogAppender" />-->
+    <!--</logger>-->
+    <!--<root>-->
+        <!--<level value="DEBUG" />-->
+        <!--<appender_ref ref="SagaLogAppender" />-->
+    <!--</root>-->
+</configuration>

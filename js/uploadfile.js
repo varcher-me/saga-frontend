@@ -134,6 +134,13 @@
 					if(notExist && fileArr.length != 0){
 						return !notExist;
 					}
+					if(item.size > 20971520){
+						alert("错误：" + item.name + "文件超过20M，不能上传！");
+						return;
+					}
+					if(fileArr.length > 100) {
+						alert("错误：每次转换不能超过100个文件！如有大量文件转换，请拆分上传！");
+                    }
 
 					fileArr.push(item);
 					var fr = new FileReader();
@@ -208,17 +215,25 @@
 					    contentType: false
 					}).done(function(res) {
 						//上传成功图标
-						alert(res);
-						upLoadSuccess.show();
-
-						//单个文件上传成功执行回调
-						setting.success(item.name);
-
+						console.log(res);
+						result=JSON.parse(res);
+						if(0 == result.returnCode){
+                            upLoadSuccess.show();
+                            //单个文件上传成功执行回调
+                            setting.success(item.name);
+						}
+						else
+						{	//upload fail show
+                            //单个文件上传失败执行回调
+                            setting.error(item.name);
+                            alert("文件"+item.name+"上传失败，原因="+result.returnMsg)
+						}
 						//全部文件上传完成执行回调函数
 						(i === (fileArr.length - 1)) && setting.complete(uuid);
 					}).fail(function(res) {
 						//单个文件上传失败执行回调
 						setting.error(item.name);
+                        alert("文件"+item.name+"上传失败，原因=错误的服务器响应");
 
 						(i === (fileArr.length - 1)) && setting.complete(uuid);
 					});

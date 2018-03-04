@@ -29,4 +29,20 @@ class MySQLiConnector
         return $this->conn;
     }
 
+    public function insert($stmt, $type, ...$param)
+    {
+        if (!$bind = $this->conn->prepare($stmt)) {
+            throw new Exception(sprintf("prepare for SQL %s failed, errno = %d, errmsg = %s",
+                $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
+        }
+        if (!$bind->bind_param($type, ...$param)) {
+            throw new Exception(sprintf("bind for SQL %s failed, errno = %d, errmsg = %s",
+                $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
+        }
+        if (!$bind->execute()) {
+            throw new Exception(sprintf("execute for SQL %s failed, errno = %d, errmsg = %s",
+                $stmt, mysqli_errno($this->conn), mysqli_error($this->conn)));
+        }
+    }
+
 }
