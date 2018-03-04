@@ -14,7 +14,7 @@ Logger::configure(dirname(__FILE__).'/logger.xml');
 $logger = Logger::getLogger('Saga');
 
 try {
-    $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret1", "saga"); //todo 参数化
+    $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret", "saga"); //todo 参数化
     uploadFileCheck();
     uploadFileMove("uploadfile/");   // todo:目标文件夹改为参数
     insertHistory();
@@ -75,7 +75,8 @@ function uploadFileMove(string $uploadPath)
     global $logger;
     $fileName = $_FILES['file']['name'];
     $fileAlias = $_FILES["file"]["tmp_name"];
-    move_uploaded_file($fileAlias, $uploadPath . $fileName);
+    $filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $fileAlias);
+    move_uploaded_file($fileAlias, $uploadPath . $filename_safe);
 
 }
 
