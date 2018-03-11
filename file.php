@@ -12,13 +12,18 @@ define("__EXCEPTION_REDIS_ERR__", 4);
 define("__EXCEPTION_UNKNOWN__", 9999);
 
 date_default_timezone_set('PRC');
-ini_set("display_errors", "On");
+//ini_set("display_errors", "On");
 
 Logger::configure(dirname(__FILE__).'/logger.xml');
 $logger = Logger::getLogger('Saga');
 $dbConn = new MySQLiConnector();
 
-$function = $_REQUEST['function'];
+if (isset($_REQUEST['function'])) {
+    $function = $_REQUEST['function'];
+}
+else{
+    $function = "";
+}
 
 switch ($function) {
     case "singleUpload":
@@ -41,9 +46,9 @@ function singleUpload()
     global $logger;
     global $dbConn;
     try {
-        $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret", "saga"); //todo 参数化
+        $dbConn = createDbConn("127.0.0.1", "3306", "saga", "saga", "saga"); //todo 参数化
         uploadFileCheck();
-        uploadFileMove("uploadfile/");   // todo:目标文件夹改为参数
+        uploadFileMove("d:/temp/init/");   // todo:目标文件夹改为参数
         insertHistory();
     } catch (Exception $e) {
         $logger->error($e->getMessage());
@@ -77,7 +82,7 @@ function transform()
     try {
         $uuid = $_REQUEST['uuid'];
         $userId = $_SERVER['REMOTE_ADDR'];
-        $dbConn = createDbConn("192.168.10.10", "3306", "homestead", "secret", "saga"); //todo 参数化
+        $dbConn = createDbConn("127.0.0.1", "3306", "saga", "saga", "saga"); //todo 参数化
         if (!verifyUserByUUID($uuid, $userId)) {
             $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
             throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
@@ -85,7 +90,7 @@ function transform()
         try {
             $redis = new RedisConnector("127.0.0.1", "6379", "");   //todo 参数化
             $redis->selectDB(2);    //todo 参数化
-            $redis->rpush("QUEUE_INITIAL", $uuid);
+            $redis->rpush("INIT_QUEUE", $uuid);
             //todo 增加防重复提交处理
         } catch (Exception $e) {
             $logger->error($e->getMessage());
@@ -99,12 +104,13 @@ function transform()
         if (isset($e)) {
             $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
             $returnMsg  = $e->getMessage();
+            $logger->info("Transforming job pushed into initial Q for UUID {$uuid} Failed by {$returnMsg}");
         } else {
             $returnCode = __EXCEPTION_SUCCESS__;
             $returnMsg  = "SUCCESSFULLY";
+            $logger->info("Transforming job pushed into initial Q for UUID {$uuid} Successfully.");
         }
 
-        $logger->info("Transforming job pushed into initial Q for UUID {$uuid}");
         return buildReturnMsg($returnCode, $returnMsg);
     }
 
@@ -141,8 +147,10 @@ function uploadFileMove(string $uploadPath)
     global $logger;
     $fileName = $_FILES['file']['name'];
     $fileAlias = $_FILES["file"]["tmp_name"];
-    $filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $fileAlias);
-    move_uploaded_file($fileAlias, $uploadPath . $filename_safe);
+    $filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $fileName);
+    if (!move_uploaded_file($fileAlias, $uploadPath . $filename_safe)) {
+        throw new Exception("Move File to destiny directory failed.");
+    }
 
 }
 
@@ -166,7 +174,7 @@ function insertHistory()
     }
 
     try {
-        $sql = "INSERT INTO history (uuid, seq_no, status, appid, userid, userip, time_post, filename_post, filename_secure) VALUES
+        $sql = "INSERT INTO history (uuid, seq_no, process_status, appid, userid, userip, time_post, filename_post, filename_secure) VALUES
                             (?,?,?,?,?,?,?,?,?)";
         $dbConn->insert($sql, 'siissssss', $uuid, $seqNo, $status, $appid, $userid, $userip, $time_post, $filename_post, $filename_safe);
     } catch (Exception $e) {
