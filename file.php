@@ -12,7 +12,9 @@ define("__EXCEPTION_REDIS_ERR__", 4);
 define("__EXCEPTION_UNKNOWN__", 9999);
 
 date_default_timezone_set('PRC');
-//ini_set("display_errors", "On");
+ini_set("display_errors", "On");
+
+$_CFG = include "configure.php";
 
 Logger::configure(dirname(__FILE__).'/logger.xml');
 $logger = Logger::getLogger('Saga');
@@ -45,8 +47,9 @@ function singleUpload()
 {
     global $logger;
     global $dbConn;
+    global $_CFG;
     try {
-        $dbConn = createDbConn("127.0.0.1", "3306", "saga", "saga", "saga"); //todo 参数化
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
         uploadFileCheck();
         uploadFileMove("d:/temp/init/");   // todo:目标文件夹改为参数
         insertHistory();
@@ -79,17 +82,18 @@ function transform()
 {
     global $logger;
     global $dbConn;
+    global $_CFG;
     try {
         $uuid = $_REQUEST['uuid'];
         $userId = $_SERVER['REMOTE_ADDR'];
-        $dbConn = createDbConn("127.0.0.1", "3306", "saga", "saga", "saga"); //todo 参数化
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
         if (!verifyUserByUUID($uuid, $userId)) {
             $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
             throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
         }
         try {
-            $redis = new RedisConnector("127.0.0.1", "6379", "");   //todo 参数化
-            $redis->selectDB(2);    //todo 参数化
+            $redis = new RedisConnector($_CFG['redis']['host'], $_CFG['redis']['port'], $_CFG['redis']['auth']);   //todo 参数化
+            $redis->selectDB($_CFG['redis']['db']);    //todo 参数化
             $redis->rpush("INIT_QUEUE", $uuid);
             //todo 增加防重复提交处理
         } catch (Exception $e) {
