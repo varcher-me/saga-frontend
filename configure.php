@@ -17,7 +17,7 @@ return Array(
     'redis' => array(
         "host" => "127.0.0.1",
         "port" => "6379",
-        "auth" => "",
+        "auth" => "foobared",
         "db"   => 2,
     )
 );

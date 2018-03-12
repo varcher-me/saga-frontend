@@ -16,6 +16,7 @@ class MySQLiConnector
     public function connect($host, $port, $user, $password, $db)
     {
         $this->conn = mysqli_connect($host, $user, $password, $db, $port);
+        mysqli_query($this->conn,'set names utf8');
         if (!$this->conn) {
             throw new Exception(sprintf("Connect to mysql failed, errno = %d, errmsg = %s",
                 mysqli_connect_errno(), mysqli_connect_error()));

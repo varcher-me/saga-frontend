@@ -100,7 +100,13 @@ function transform()
             $logger->error($e->getMessage());
             $logger->error($e->getTraceAsString());
             throw new Exception("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
+        } catch (Error $e){
+            $logger->error($e->getMessage());
+            $logger->error($e->getTraceAsString());
+            throw new Exception("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
         }
+
+
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
@@ -171,10 +177,14 @@ function insertHistory()
     $userip             = $_SERVER['REMOTE_ADDR'] ;
     $time_post          = date("Y-m-d H:i:s", time());
     $filename_post      = rawurldecode($_FILES['file']['name']);
+//    $filename_post      = $_FILES['file']['name'];
     $filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $filename_post);
 
-    if ($uuid == "") {      // todo: 测试代码
-        $uuid = $time_post;
+    if (mb_detect_encoding($filename_post) != "UTF-8") {
+        $filename_post = iconv(mb_detect_encoding($filename_post), "UTF-8", $filename_post);
+    }
+    if (mb_detect_encoding($filename_safe) != "UTF-8") {
+        $filename_safe = iconv(mb_detect_encoding($filename_safe), "UTF-8", $filename_safe);
     }
 
     try {
