@@ -56,6 +56,9 @@ function singleUpload()
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
+    } catch (Error $e){
+        $logger->fatal($e->getMessage());
+        $logger->fatal($e->getTraceAsString());
 //    throw $e;
     } finally {
         if (isset($e)) {
@@ -100,16 +103,14 @@ function transform()
             $logger->error($e->getMessage());
             $logger->error($e->getTraceAsString());
             throw new Exception("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
-        } catch (Error $e){
-            $logger->error($e->getMessage());
-            $logger->error($e->getTraceAsString());
-            throw new Exception("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
         }
-
 
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
+    } catch (Error $e){
+        $logger->fatal($e->getMessage());
+        $logger->fatal($e->getTraceAsString());
     } finally {
         if (isset($e)) {
             $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
