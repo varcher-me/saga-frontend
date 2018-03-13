@@ -8,7 +8,8 @@ define("__EXCEPTION_DBER__", 1);
 define("__EXCEPTION_FILE_ERROR__", 2);
 define("__EXCEPTION_FUNCTION_UNKNOWN__", 3);
 define("__EXCEPTION_USER_UNMATCH__", 4);
-define("__EXCEPTION_REDIS_ERR__", 4);
+define("__EXCEPTION_REDIS_ERR__", 5);
+define("__EXCEPTION_NO_UUID__", 6);
 define("__EXCEPTION_UNKNOWN__", 9999);
 
 date_default_timezone_set('PRC');
@@ -34,6 +35,9 @@ switch ($function) {
     case "transform":
         $retMsg = transform();
         break;
+    case "showList":
+        $retMsg = showList();
+        break;
     default:
         $retMsg = buildReturnMsg(__EXCEPTION_FUNCTION_UNKNOWN__, "CALL_FUNCTION_UNKNOWN");
         $logMsg = sprintf("Unknown Call Function %s From IP:[%s]", $function, $_SERVER['REMOTE_ADDR']);
@@ -51,7 +55,7 @@ function singleUpload()
     try {
         $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
         uploadFileCheck();
-        uploadFileMove("d:/temp/init/");   // todo:目标文件夹改为参数
+//        uploadFileMove("d:/temp/init/");   // todo:目标文件夹改为参数
         insertHistory();
     } catch (Exception $e) {
         $logger->error($e->getMessage());
@@ -124,8 +128,49 @@ function transform()
 
         return buildReturnMsg($returnCode, $returnMsg);
     }
+}
+
+function showList()
+{
+    global $logger;
+    global $dbConn;
+    global $_CFG;
+    try {
+        $uuid = $_REQUEST['uuid'];
+        $userId = $_SERVER['REMOTE_ADDR'];
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
+        if (!verifyUserByUUID($uuid, $userId)) {
+            $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
+            throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
+        }
+        $result = getListByUUID($uuid);
+        var_dump($result);
+        $line = $result->fetch_array(MYSQLI_ASSOC);
+        var_dump($line);
+
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+    } catch (Error $e){
+        $logger->fatal($e->getMessage());
+        $logger->fatal($e->getTraceAsString());
+    } finally {
+        if (isset($e)) {
+            $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
+            $returnMsg  = $e->getMessage();
+            $logger->info("show list for UUID {$uuid} Failed by {$returnMsg}");
+        } else {
+            $returnCode = __EXCEPTION_SUCCESS__;
+            $returnMsg  = "SUCCESSFULLY";
+            $logger->info("show list for UUID {$uuid} successfully.");
+        }
+
+        return buildReturnMsg($returnCode, $returnMsg);
+    }
 
 }
+
+
 
 function createDbConn($host, $port, $user, $password, $db)
 {
@@ -234,8 +279,29 @@ function verifyUserByUUID(string $uuid, string $inUser):bool
         $sql = "SELECT userid FROM history WHERE uuid = ? LIMIT 1";
         $stmt = $dbConn->select($sql, 's', $uuid);
         $stmt->bind_result($userId);
-        $stmt->fetch();
+        $result = $stmt->fetch();
+        if ($result == null) {
+            throw new Exception("NO UUID {$uuid}.", __EXCEPTION_NO_UUID__);
+        }
         return $userId == $inUser;
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+        throw new Exception("SELECT Failed.", __EXCEPTION_DBER__);
+    }
+}
+
+function getListByUUID(string $uuid): mysqli_result
+{
+    global $dbConn;
+    global $logger;
+
+    try {
+        $sql = "SELECT process_status, time_post, time_process, filename_secure, filename_server, process_phase, process_comment 
+                FROM history WHERE uuid = ?";
+        $stmt = $dbConn->select($sql, 's', $uuid);
+        $resultArray = $stmt->get_result();
+        return $resultArray;
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
