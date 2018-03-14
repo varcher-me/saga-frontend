@@ -57,7 +57,7 @@ function singleUpload()
     try {
         $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
         uploadFileCheck();
-//        uploadFileMove("d:/temp/init/");   // todo:目标文件夹改为参数
+        uploadFileMove($_CFG['path']['init']);
         insertHistory();
     } catch (Exception $e) {
         $logger->error($e->getMessage());

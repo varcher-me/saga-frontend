@@ -19,5 +19,11 @@ return Array(
         "port" => "6379",
         "auth" => "",
         "db"   => 2,
-    )
+    ),
+    'path' => array(
+        "init"      => "/tmp/saga/init/",
+        "processed" => "/tmp/saga/processed/",
+        "error"     => "/tmp/saga/error/",
+        "result"    => "/tmp/saga/result/",
+    ),
 );
