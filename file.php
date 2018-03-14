@@ -1,5 +1,6 @@
 <?php
 include "log4php/Logger.php";
+include "Exception/SagaException.php";
 include "Connector/MySQLiConnector.php";
 include "Connector/RedisConnector.php";
 
@@ -16,6 +17,7 @@ date_default_timezone_set('PRC');
 ini_set("display_errors", "On");
 
 $_CFG = include "configure.php";
+
 
 Logger::configure(dirname(__FILE__).'/logger.xml');
 $logger = Logger::getLogger('Saga');
@@ -106,7 +108,7 @@ function transform()
         } catch (Exception $e) {
             $logger->error($e->getMessage());
             $logger->error($e->getTraceAsString());
-            throw new Exception("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
+            throw new SagaRedisException("REDIS operate failed.", __EXCEPTION_REDIS_ERR__);
         }
 
     } catch (Exception $e) {
@@ -136,6 +138,7 @@ function showList()
     global $dbConn;
     global $_CFG;
     try {
+        // todo:增加排队状态检查
         $uuid = $_REQUEST['uuid'];
         $userId = $_SERVER['REMOTE_ADDR'];
         $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
@@ -143,10 +146,22 @@ function showList()
             $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
             throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
         }
+        $output = "<table><tr><td>文件名</td><td>处理状态</td><td>说明</td></tr>\n";
         $result = getListByUUID($uuid);
-        var_dump($result);
-        $line = $result->fetch_array(MYSQLI_ASSOC);
-        var_dump($line);
+        while ($line = $result->fetch_array(MYSQLI_ASSOC)) {
+        /*
+         *   'process_status' => int 1
+  'time_post' => string '2018-03-03 22:49:05' (length=19)
+  'time_process' => null
+  'filename_secure' => string 'sheet_google_64.png' (length=19)
+  'filename_server' => string '/tmp/phpJVzphr' (length=14)
+  'process_phase' => null
+  'process_comment' => null
+         */
+            $output .= "<tr><td>{$line['filename_secure']}</td><td>{$line['process_status']}</td><td>{$line['process_comment']}</td></tr>";
+        }
+        $output .= "</table>";
+
 
     } catch (Exception $e) {
         $logger->error($e->getMessage());
@@ -163,6 +178,7 @@ function showList()
             $returnCode = __EXCEPTION_SUCCESS__;
             $returnMsg  = "SUCCESSFULLY";
             $logger->info("show list for UUID {$uuid} successfully.");
+            return $output;
         }
 
         return buildReturnMsg($returnCode, $returnMsg);
@@ -182,7 +198,7 @@ function createDbConn($host, $port, $user, $password, $db)
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
-        throw new Exception("Connection to Database failed.", __EXCEPTION_DBER__);
+        throw new MySQLException("Connection to Database failed.", __EXCEPTION_DBER__);
     }
 }
 
@@ -194,7 +210,7 @@ function uploadFileCheck()
     }
     elseif ($_FILES['file']['error'] != 0) {
         $msg = getUploadErrorMsg($_FILES['file']['error']);
-        throw new Exception($msg, __EXCEPTION_FILE_ERROR__);
+        throw new FileException($msg, __EXCEPTION_FILE_ERROR__);
     }
 }
 
@@ -205,7 +221,7 @@ function uploadFileMove(string $uploadPath)
     $fileAlias = $_FILES["file"]["tmp_name"];
     $filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $fileName);
     if (!move_uploaded_file($fileAlias, $uploadPath . $filename_safe)) {
-        throw new Exception("Move File to destiny directory failed.");
+        throw new FileException("Move File to destiny directory failed.");
     }
 
 }
@@ -240,7 +256,7 @@ function insertHistory()
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
-        throw new Exception("Insert History Failed.", __EXCEPTION_DBER__);
+        throw new MySQLException("Insert History Failed.", __EXCEPTION_DBER__);
     }
 }
 
@@ -287,7 +303,7 @@ function verifyUserByUUID(string $uuid, string $inUser):bool
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
-        throw new Exception("SELECT Failed.", __EXCEPTION_DBER__);
+        throw new MySQLException("SELECT Failed.", __EXCEPTION_DBER__);
     }
 }
 
@@ -305,7 +321,7 @@ function getListByUUID(string $uuid): mysqli_result
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
-        throw new Exception("SELECT Failed.", __EXCEPTION_DBER__);
+        throw new MySQLException("SELECT Failed.", __EXCEPTION_DBER__);
     }
 }
 ?>
