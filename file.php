@@ -146,7 +146,7 @@ function showList()
             $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
             throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
         }
-        $output = "<table><tr><td>文件名</td><td>处理状态</td><td>说明</td></tr>\n";
+        $output = "<table><tr><td>文件名</td><td>处理状态</td><td>说明</td></tr>\n"; // TODO:增加css
         $result = getListByUUID($uuid);
         while ($line = $result->fetch_array(MYSQLI_ASSOC)) {
         /*
