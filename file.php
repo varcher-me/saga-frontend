@@ -40,6 +40,9 @@ switch ($function) {
     case "showList":
         $retMsg = showList();
         break;
+    case "downFile":
+        downFile();
+        break;
     default:
         $retMsg = buildReturnMsg(__EXCEPTION_FUNCTION_UNKNOWN__, "CALL_FUNCTION_UNKNOWN");
         $logMsg = sprintf("Unknown Call Function %s From IP:[%s]", $function, $_SERVER['REMOTE_ADDR']);
@@ -55,7 +58,7 @@ function singleUpload()
     global $dbConn;
     global $_CFG;
     try {
-        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']);
         uploadFileCheck();
         uploadFileMove($_CFG['path']['init']);
         insertHistory();
@@ -95,14 +98,14 @@ function transform()
     try {
         $uuid = $_REQUEST['uuid'];
         $userId = $_SERVER['REMOTE_ADDR'];
-        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']);
         if (!verifyUserByUUID($uuid, $userId)) {
             $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
             throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
         }
         try {
-            $redis = new RedisConnector($_CFG['redis']['host'], $_CFG['redis']['port'], $_CFG['redis']['auth']);   //todo 参数化
-            $redis->selectDB($_CFG['redis']['db']);    //todo 参数化
+            $redis = new RedisConnector($_CFG['redis']['host'], $_CFG['redis']['port'], $_CFG['redis']['auth']);
+            $redis->selectDB($_CFG['redis']['db']);
             $redis->rpush("INIT_QUEUE", $uuid);
             //todo 增加防重复提交处理
         } catch (Exception $e) {
@@ -146,10 +149,11 @@ function showList()
             $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
             throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
         }
-        $output = "<table><tr><td>文件名</td><td>处理状态</td><td>说明</td></tr>\n"; // TODO:增加css
+        $output = "<table><tr><td>文件名</td><td>处理状态</td><td>说明</td><td>下载</td></tr>\n"; // TODO:增加css
         $result = getListByUUID($uuid);
         while ($line = $result->fetch_array(MYSQLI_ASSOC)) {
         /*
+             *  'seq_no, '
          *   'process_status' => int 1
   'time_post' => string '2018-03-03 22:49:05' (length=19)
   'time_process' => null
@@ -158,7 +162,10 @@ function showList()
   'process_phase' => null
   'process_comment' => null
          */
-            $output .= "<tr><td>{$line['filename_secure']}</td><td>{$line['process_status']}</td><td>{$line['process_comment']}</td></tr>";
+            $output .= "<tr><td>{$line['filename_secure']}</td>
+<td>{$line['process_status']}</td>
+<td>{$line['process_comment']}</td>
+<td><a href='file.php?function=downFile&uuid={$uuid}&seqNo={$line['seq_no']}'</td></tr>";
         }
         $output .= "</table>";
 
@@ -175,8 +182,6 @@ function showList()
             $returnMsg  = $e->getMessage();
             $logger->info("show list for UUID {$uuid} Failed by {$returnMsg}");
         } else {
-            $returnCode = __EXCEPTION_SUCCESS__;
-            $returnMsg  = "SUCCESSFULLY";
             $logger->info("show list for UUID {$uuid} successfully.");
             return $output;
         }
@@ -186,7 +191,55 @@ function showList()
 
 }
 
+function downFile()
+{
+    global $logger;
+    global $dbConn;
+    global $_CFG;
+    try {
+        // todo:增加排队状态检查
+        $uuid = $_REQUEST['uuid'];
+        $seqNo = $_REQUEST['seqNo'];
+        $userId = $_SERVER['REMOTE_ADDR'];
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
+        if (!verifyUserByUUID($uuid, $userId)) {
+            $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
+            throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
+        }
+        $result = getFileByKey($uuid, $seqNo);
+        if ($result->num_rows != 1) {
+            throw New MySQLException("Get File for {$uuid}-{$seqNo} Failed.", __EXCEPTION_DBER__);
+        }
+        $line = $result->fetch_array(MYSQLI_ASSOC);
+            /*l
+      'filename_secure' => string 'sheet_google_64.png' (length=19)
+      'filename_server' => string '/tmp/phpJVzphr' (length=14)
+             */
+            $filePathName = $_CFG['path']['result'] . $line['filename_server'];
+            downloadFile($filePathName, $line['filename_secure']);
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+    } catch (Error $e){
+        $logger->fatal($e->getMessage());
+        $logger->fatal($e->getTraceAsString());
+    }
+}
 
+function downloadFile(string $filePathName, string $fileDownName)
+{
+    if (!file_exists($filePathName)) {
+        throw new FileException("Result File {$filePathName} not existed.", __EXCEPTION_FILE_ERROR__);
+    }
+    $file=fopen($filePathName,"r");
+    $fileSize = filesize($filePathName);
+    header("Content-Type: application/octet-stream");
+    header("Accept-Ranges: bytes");
+    header("Accept-Length: ".$fileSize);
+    header("Content-Disposition: attachment; filename={$fileDownName}");
+    echo fread($file,$fileSize);
+    fclose($file);
+}
 
 function createDbConn($host, $port, $user, $password, $db)
 {
@@ -313,9 +366,27 @@ function getListByUUID(string $uuid): mysqli_result
     global $logger;
 
     try {
-        $sql = "SELECT process_status, time_post, time_process, filename_secure, filename_server, process_phase, process_comment 
+        $sql = "SELECT seq_no, process_status, time_post, time_process, filename_secure, filename_server, process_phase, process_comment 
                 FROM history WHERE uuid = ?";
         $stmt = $dbConn->select($sql, 's', $uuid);
+        $resultArray = $stmt->get_result();
+        return $resultArray;
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+        throw new MySQLException("SELECT Failed.", __EXCEPTION_DBER__);
+    }
+}
+
+function getFileByKey(string $uuid, int $seqNo): mysqli_result
+{
+    global $dbConn;
+    global $logger;
+
+    try {
+        $sql = "SELECT filename_secure, filename_server
+                FROM history WHERE uuid = ? AND seq_no = ?";
+        $stmt = $dbConn->select($sql, 'si', $uuid, $seqNo);
         $resultArray = $stmt->get_result();
         return $resultArray;
     } catch (Exception $e) {
