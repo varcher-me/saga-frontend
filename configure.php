@@ -21,9 +21,9 @@ return Array(
         "db"   => 2,
     ),
     'path' => array(
-        "init"      => "/tmp/saga/init/",
+        "init"      => "d:/temp/init/",
         "processed" => "/tmp/saga/processed/",
         "error"     => "/tmp/saga/error/",
-        "result"    => "/tmp/saga/result/",
+        "result"    => "d:/temp/result/",
     ),
 );

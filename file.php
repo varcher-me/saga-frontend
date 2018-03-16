@@ -165,7 +165,7 @@ function showList()
             $output .= "<tr><td>{$line['filename_secure']}</td>
 <td>{$line['process_status']}</td>
 <td>{$line['process_comment']}</td>
-<td><a href='file.php?function=downFile&uuid={$uuid}&seqNo={$line['seq_no']}'</td></tr>";
+<td><a href='file.php?function=downFile&uuid={$uuid}&seqNo={$line['seq_no']}'>下载</a></td></tr>";
         }
         $output .= "</table>";
 
@@ -215,8 +215,9 @@ function downFile()
       'filename_secure' => string 'sheet_google_64.png' (length=19)
       'filename_server' => string '/tmp/phpJVzphr' (length=14)
              */
-            $filePathName = $_CFG['path']['result'] . $line['filename_server'];
-            downloadFile($filePathName, $line['filename_secure']);
+            $filePathName = $_CFG['path']['result'] . $line['filename_server']. ".pdf";
+            $fileDownName = $line['filename_secure']. ".pdf";
+            downloadFile($filePathName, $fileDownName);
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
@@ -228,6 +229,7 @@ function downFile()
 
 function downloadFile(string $filePathName, string $fileDownName)
 {
+    echo $filePathName;
     if (!file_exists($filePathName)) {
         throw new FileException("Result File {$filePathName} not existed.", __EXCEPTION_FILE_ERROR__);
     }
