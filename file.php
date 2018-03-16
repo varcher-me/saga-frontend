@@ -90,7 +90,7 @@ function singleUpload()
     }
 }
 
-function transform()
+function transform()  //todo: 异常返回控制
 {
     global $logger;
     global $dbConn;
@@ -135,7 +135,7 @@ function transform()
     }
 }
 
-function showList()
+function showList() //todo: 异常返回控制
 {
     global $logger;
     global $dbConn;
@@ -191,13 +191,12 @@ function showList()
 
 }
 
-function downFile()
+function downFile() //todo: 异常返回控制
 {
     global $logger;
     global $dbConn;
     global $_CFG;
     try {
-        // todo:增加排队状态检查
         $uuid = $_REQUEST['uuid'];
         $seqNo = $_REQUEST['seqNo'];
         $userId = $_SERVER['REMOTE_ADDR'];
@@ -229,7 +228,6 @@ function downFile()
 
 function downloadFile(string $filePathName, string $fileDownName)
 {
-    echo $filePathName;
     if (!file_exists($filePathName)) {
         throw new FileException("Result File {$filePathName} not existed.", __EXCEPTION_FILE_ERROR__);
     }
