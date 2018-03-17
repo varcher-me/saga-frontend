@@ -43,6 +43,9 @@ switch ($function) {
     case "downFile":
         downFile();
         break;
+    case "downFilePack":
+        downFilePack();
+        break;
     default:
         $retMsg = buildReturnMsg(__EXCEPTION_FUNCTION_UNKNOWN__, "CALL_FUNCTION_UNKNOWN");
         $logMsg = sprintf("Unknown Call Function %s From IP:[%s]", $function, $_SERVER['REMOTE_ADDR']);
@@ -167,7 +170,8 @@ function showList() //todo: 异常返回控制
 <td>{$line['process_comment']}</td>
 <td><a href='file.php?function=downFile&uuid={$uuid}&seqNo={$line['seq_no']}'>下载</a></td></tr>";
         }
-        $output .= "</table>";
+        $output .= "
+        <tr><td colspan=4><a href='file.php?function=downFilePack&uuid={$uuid}'>打包下载</a></td></tr></table>";
 
 
     } catch (Exception $e) {
@@ -226,6 +230,43 @@ function downFile() //todo: 异常返回控制
     }
 }
 
+function downFilePack() //todo: 异常返回控制
+{
+    global $logger;
+    global $dbConn;
+    global $_CFG;
+    try {
+        $uuid = $_REQUEST['uuid'];
+        $userId = $_SERVER['REMOTE_ADDR'];
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']); //todo 参数化
+        if (!verifyUserByUUID($uuid, $userId)) {
+            $logger->error("UnMatched user for UUID {$uuid}, current user is {$userId}.");
+            throw new Exception("Unmatched user.", __EXCEPTION_USER_UNMATCH__);
+        }
+        $result = getListByUUID($uuid);
+        $fileArray = Array();
+        if ($result->num_rows < 1) {
+            throw New MySQLException("Get FileList for {$uuid} Failed.", __EXCEPTION_DBER__);
+        }
+        while ($line = $result->fetch_array(MYSQLI_ASSOC)) {
+            if ($line['process_status'] == 4 or $line['process_status'] == 5) {
+                $filePathName = $_CFG['path']['result'] . $line['filename_server'] . ".pdf";
+                $fileDownName = $line['filename_secure'] . ".pdf";
+                if (file_exists($filePathName)) {
+                    $fileArray[] = ['pathName' => $filePathName, 'downName' => $fileDownName];
+                }
+            }
+        }
+        downloadFilePacked($uuid, $fileArray);
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+    } catch (Error $e){
+        $logger->fatal($e->getMessage());
+        $logger->fatal($e->getTraceAsString());
+    }
+}
+
 function downloadFile(string $filePathName, string $fileDownName)
 {
     if (!file_exists($filePathName)) {
@@ -239,6 +280,24 @@ function downloadFile(string $filePathName, string $fileDownName)
     header("Content-Disposition: attachment; filename={$fileDownName}");
     echo fread($file,$fileSize);
     fclose($file);
+}
+
+function downloadFilePacked(string $uuid, array $fileList)
+{
+    $zip=new ZipArchive();
+    if($zip->open('d:/temp.zip', ZipArchive::CREATE)=== TRUE){
+        foreach ($fileList as $file) {
+            $zip->addFile($file['pathName'], $file['downName']);
+        }
+        $zip->close();
+    }
+    header("Cache-Control: public");
+    header("Content-Description: File Transfer");
+    header("Content-disposition: attachment; filename={$uuid}.zip"); //文件名
+    header("Content-Type: application/zip"); //zip格式的
+    header("Content-Transfer-Encoding: binary"); //告诉浏览器，这是二进制文件
+    header('Content-Length: '. filesize("d:/temp.zip")); //告诉浏览器，文件大小
+    @readfile('d:/temp.zip');
 }
 
 function createDbConn($host, $port, $user, $password, $db)
@@ -395,4 +454,5 @@ function getFileByKey(string $uuid, int $seqNo): mysqli_result
         throw new MySQLException("SELECT Failed.", __EXCEPTION_DBER__);
     }
 }
+
 ?>
