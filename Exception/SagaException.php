@@ -26,3 +26,13 @@ class FileException extends SystemException
 {
 
 }
+
+class ApplicationException extends Exception
+{
+
+}
+
+class NoFilePackedException extends ApplicationException
+{
+
+}

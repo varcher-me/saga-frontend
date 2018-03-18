@@ -22,8 +22,9 @@ return Array(
     ),
     'path' => array(
         "init"      => "d:/temp/init/",
-        "processed" => "/tmp/saga/processed/",
-        "error"     => "/tmp/saga/error/",
+//        "processed" => "/tmp/saga/processed/",
+//        "error"     => "/tmp/saga/error/",
         "result"    => "d:/temp/result/",
+        "temp"      => "d:/temp/",
     ),
 );

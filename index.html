@@ -24,7 +24,8 @@
 			},
 			complete : function (uuid) {
 				alert('所有文件上传完毕，单击确定开始转换！批次号 = ' + uuid);
-                window.location.href="file.php?function=transform&uuid="+uuid;
+                saga_trasnform(uuid);
+                window.location.href="file.php?function=showList&uuid="+uuid;
 			}
 		});
 	</script>

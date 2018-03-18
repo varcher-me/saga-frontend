@@ -41,10 +41,10 @@ switch ($function) {
         $retMsg = showList();
         break;
     case "downFile":
-        downFile();
+        $retMsg = downFile();
         break;
     case "downFilePack":
-        downFilePack();
+        $retMsg = downFilePack();
         break;
     default:
         $retMsg = buildReturnMsg(__EXCEPTION_FUNCTION_UNKNOWN__, "CALL_FUNCTION_UNKNOWN");
@@ -155,25 +155,21 @@ function showList() //todo: 异常返回控制
         $output = "<table><tr><td>文件名</td><td>处理状态</td><td>说明</td><td>下载</td></tr>\n"; // TODO:增加css
         $result = getListByUUID($uuid);
         while ($line = $result->fetch_array(MYSQLI_ASSOC)) {
-        /*
-             *  'seq_no, '
-         *   'process_status' => int 1
-  'time_post' => string '2018-03-03 22:49:05' (length=19)
-  'time_process' => null
-  'filename_secure' => string 'sheet_google_64.png' (length=19)
-  'filename_server' => string '/tmp/phpJVzphr' (length=14)
-  'process_phase' => null
-  'process_comment' => null
-         */
+            $status = $line['process_status'];
+            if ($status == 4 or $status == 5) {
+                $link = "<a href='file.php?function=downFile&uuid={$uuid}&seqNo={$line['seq_no']}'>下载</a>";
+                $comment = "转换成功";
+            }else{
+                $link = "";
+                $comment = $line['process_comment'];
+            }
             $output .= "<tr><td>{$line['filename_secure']}</td>
-<td>{$line['process_status']}</td>
-<td>{$line['process_comment']}</td>
-<td><a href='file.php?function=downFile&uuid={$uuid}&seqNo={$line['seq_no']}'>下载</a></td></tr>";
+<td>{$status}</td>
+<td>{$comment}</td>
+<td>{$link}</td></tr>";
         }
         $output .= "
         <tr><td colspan=4><a href='file.php?function=downFilePack&uuid={$uuid}'>打包下载</a></td></tr></table>";
-
-
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
@@ -189,10 +185,8 @@ function showList() //todo: 异常返回控制
             $logger->info("show list for UUID {$uuid} successfully.");
             return $output;
         }
-
         return buildReturnMsg($returnCode, $returnMsg);
     }
-
 }
 
 function downFile() //todo: 异常返回控制
@@ -214,10 +208,6 @@ function downFile() //todo: 异常返回控制
             throw New MySQLException("Get File for {$uuid}-{$seqNo} Failed.", __EXCEPTION_DBER__);
         }
         $line = $result->fetch_array(MYSQLI_ASSOC);
-            /*l
-      'filename_secure' => string 'sheet_google_64.png' (length=19)
-      'filename_server' => string '/tmp/phpJVzphr' (length=14)
-             */
             $filePathName = $_CFG['path']['result'] . $line['filename_server']. ".pdf";
             $fileDownName = $line['filename_secure']. ".pdf";
             downloadFile($filePathName, $fileDownName);
@@ -261,9 +251,11 @@ function downFilePack() //todo: 异常返回控制
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
+        return $e->getMessage();
     } catch (Error $e){
         $logger->fatal($e->getMessage());
         $logger->fatal($e->getTraceAsString());
+        return $e->getMessage();
     }
 }
 
@@ -284,20 +276,27 @@ function downloadFile(string $filePathName, string $fileDownName)
 
 function downloadFilePacked(string $uuid, array $fileList)
 {
-    $zip=new ZipArchive();
-    if($zip->open('d:/temp.zip', ZipArchive::CREATE)=== TRUE){
-        foreach ($fileList as $file) {
-            $zip->addFile($file['pathName'], $file['downName']);
+    global $_CFG;
+    $zip  = new ZipArchive();
+    $file = $_CFG['path']['temp']."{$uuid}.zip";
+    if($zip->open($file, ZipArchive::CREATE)=== TRUE){
+        foreach ($fileList as $infile) {
+            $zip->addFile($infile['pathName'], $infile['downName']);
         }
         $zip->close();
     }
+    var_dump($file);
+    if (!file_exists($file)) {
+        throw new NoFilePackedException("No file packed.", __EXCEPTION_UNKNOWN__);
+    }
     header("Cache-Control: public");
     header("Content-Description: File Transfer");
-    header("Content-disposition: attachment; filename={$uuid}.zip"); //文件名
+    header("Content-disposition: attachment; filename={$file}"); //文件名
     header("Content-Type: application/zip"); //zip格式的
     header("Content-Transfer-Encoding: binary"); //告诉浏览器，这是二进制文件
-    header('Content-Length: '. filesize("d:/temp.zip")); //告诉浏览器，文件大小
-    @readfile('d:/temp.zip');
+    header('Content-Length: '. filesize($file)); //告诉浏览器，文件大小
+    @readfile($file);
+    unlink($file);
 }
 
 function createDbConn($host, $port, $user, $password, $db)

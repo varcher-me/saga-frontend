@@ -89,7 +89,7 @@
 			beginUpload = $('.file_info_handle .file_info .uploadfile', _this),
 			fileShow = $('.file_show', _this),
 			noDragSelFile = $('.file_show .sel_file_btn', _this);
-			
+
 			//显示拖拽上传部分
 			setting.canDrag || fileShow.show();
 
@@ -100,25 +100,25 @@
 			selFileIpt.on('change', selFile);
 
 			//让按钮去触发input的click事件
-			selFileBtn.on('click', function () {  
+			selFileBtn.on('click', function () {
 				$(this).prev().click();
 			})
 
 			fileDrag.on({
-				dragover : dragOver, 
+				dragover : dragOver,
 				drop : selFile
 			})
 
 			beginUpload.on('click', upLoadFile);
 
-			
+
 
 			// 选择文件
 			function selFile (e) {
 				e = e || window.event;
 				//阻止浏览器的默认行为
-				if(e.preventDefault){  
-					e.preventDefault();	
+				if(e.preventDefault){
+					e.preventDefault();
 				}else{
 					e.returnValue = false;
 				}
@@ -172,14 +172,14 @@
 							noDragSelFile.before(imgDom);
 						}
 					}
-				}) 
+				})
 
 				//选择的文件的信息
 				fileCount.html(fileArr.length);
 				fileSz.html(getFileInfo());
 
 				//防止在删除了上次选择的文件后，再次选择相同的文件无效的问题。
-				this.value ='';  
+				this.value ='';
 			}
 
 			//拖拽
@@ -198,9 +198,9 @@
 				console.log("uuid = " + uuid);
 				fileArr.forEach(function (item, i) {
 					var upLoadSuccess = $('.img_box').eq(i).children('.up_load_success');
-					
+
 					//防止重复上传
-					if(upLoadSuccess.css('display') === 'block') return false;   
+					if(upLoadSuccess.css('display') === 'block') return false;
 					var formData = new FormData();
 					formData.append('file', item);
 					formData.append('uuid', uuid);
@@ -270,6 +270,36 @@
 		})
 	}
 })(jQuery)
+
+
+function saga_trasnform(uuid) {
+    var formData = new FormData();
+    formData.append('uuid', uuid);
+    formData.append('function', 'transform');
+    console.log("uuid" + uuid + "ready to transform.");
+    $.ajax({
+        url: "file.php",
+        type: 'POST',
+        cache: false,
+        data: formData,
+        processData: false,
+        contentType: false
+    }).done(function(res) {
+        console.log(res);
+        result=JSON.parse(res);
+        if(0 == result.returnCode){
+            alert("转换成功")
+        }
+        else
+        {
+            alert("转换失败，原因="+result.returnMsg)
+        }
+    }).fail(function(res) {
+        console.log(res);
+        result=JSON.parse(res);
+        alert("转换失败，原因="+result.returnMsg)
+    });
+}
 
 function guid() {
     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
