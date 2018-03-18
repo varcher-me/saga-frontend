@@ -3,15 +3,7 @@ include "log4php/Logger.php";
 include "Exception/SagaException.php";
 include "Connector/MySQLiConnector.php";
 include "Connector/RedisConnector.php";
-
-define("__EXCEPTION_SUCCESS__", 0);
-define("__EXCEPTION_DBER__", 1);
-define("__EXCEPTION_FILE_ERROR__", 2);
-define("__EXCEPTION_FUNCTION_UNKNOWN__", 3);
-define("__EXCEPTION_USER_UNMATCH__", 4);
-define("__EXCEPTION_REDIS_ERR__", 5);
-define("__EXCEPTION_NO_UUID__", 6);
-define("__EXCEPTION_UNKNOWN__", 9999);
+include "constant.php";
 
 date_default_timezone_set('PRC');
 ini_set("display_errors", "On");
@@ -31,6 +23,9 @@ else{
 }
 
 switch ($function) {
+    case "initialize":
+        $retMsg = initialize();
+        break;
     case "singleUpload":
         $retMsg = singleUpload();
         break;
@@ -55,13 +50,45 @@ switch ($function) {
 }
 echo $retMsg;
 
-function singleUpload()
+function initialize()
 {
     global $logger;
     global $dbConn;
     global $_CFG;
     try {
         $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']);
+        insertPostList();
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+    } catch (Error $e){
+        $logger->fatal($e->getMessage());
+        $logger->fatal($e->getTraceAsString());
+//    throw $e;
+    } finally {
+        if (isset($e)) {
+            $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
+            $returnMsg = $e->getMessage();
+            $logger->info("INITIALIZE FAILED.");
+        } else {
+            $returnCode = __EXCEPTION_SUCCESS__;
+            $returnMsg = "SUCCESSFULLY";
+            $logger->info("INITIALIZE SUCCESSFULLY.");
+        }
+        return buildReturnMsg($returnCode, $returnMsg);
+    }
+}
+
+function singleUpload()
+{
+    global $logger;
+    global $dbConn;
+    global $_CFG;
+    $uuid = $_REQUEST['uuid'];
+    $userid = $_SERVER['REMOTE_ADDR'];
+    try {
+        $dbConn = createDbConn($_CFG['mysql']['host'], $_CFG['mysql']['port'], $_CFG['mysql']['user'], $_CFG['mysql']['pass'], $_CFG['mysql']['database']);
+        verifyUserByUUID($uuid, $userid);
         uploadFileCheck();
         uploadFileMove($_CFG['path']['init']);
         insertHistory();
@@ -93,7 +120,7 @@ function singleUpload()
     }
 }
 
-function transform()  //todo: 异常返回控制
+function transform()
 {
     global $logger;
     global $dbConn;
@@ -138,7 +165,7 @@ function transform()  //todo: 异常返回控制
     }
 }
 
-function showList() //todo: 异常返回控制
+function showList()
 {
     global $logger;
     global $dbConn;
@@ -170,22 +197,15 @@ function showList() //todo: 异常返回控制
         }
         $output .= "
         <tr><td colspan=4><a href='file.php?function=downFilePack&uuid={$uuid}'>打包下载</a></td></tr></table>";
+        return $output;
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
+        return $e->getMessage();
     } catch (Error $e){
         $logger->fatal($e->getMessage());
         $logger->fatal($e->getTraceAsString());
-    } finally {
-        if (isset($e)) {
-            $returnCode = $e->getCode() > 0 ? $e->getCode() : __EXCEPTION_UNKNOWN__;
-            $returnMsg  = $e->getMessage();
-            $logger->info("show list for UUID {$uuid} Failed by {$returnMsg}");
-        } else {
-            $logger->info("show list for UUID {$uuid} successfully.");
-            return $output;
-        }
-        return buildReturnMsg($returnCode, $returnMsg);
+        return $e->getMessage();
     }
 }
 
@@ -220,7 +240,7 @@ function downFile() //todo: 异常返回控制
     }
 }
 
-function downFilePack() //todo: 异常返回控制
+function downFilePack()
 {
     global $logger;
     global $dbConn;
@@ -248,6 +268,7 @@ function downFilePack() //todo: 异常返回控制
             }
         }
         downloadFilePacked($uuid, $fileArray);
+        return "";
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
@@ -315,7 +336,6 @@ function createDbConn($host, $port, $user, $password, $db)
 
 function uploadFileCheck()
 {
-    global $logger;
     if (!isset ($_FILES['file'])) {
         throw new Exception("No File uploaded.", __EXCEPTION_FILE_ERROR__);
     }
@@ -327,7 +347,6 @@ function uploadFileCheck()
 
 function uploadFileMove(string $uploadPath)
 {
-    global $logger;
     $fileName = $_FILES['file']['name'];
     $fileAlias = $_FILES["file"]["tmp_name"];
     $filename_safe      = preg_replace("&[\\\/:\*<>\|\?~$]&", "_", $fileName);
@@ -335,6 +354,29 @@ function uploadFileMove(string $uploadPath)
         throw new FileException("Move File to destiny directory failed.");
     }
 
+}
+
+function insertPostList()
+{
+    global $dbConn;
+    global $logger;
+
+    $uuid               = $_REQUEST['uuid'];
+    $status             = 1;
+    $appid              = "00";
+    $userid             = $_SERVER['REMOTE_ADDR'] ;
+    $userip             = $_SERVER['REMOTE_ADDR'] ;
+    $time_post          = date("Y-m-d H:i:s", time());
+
+    try {
+        $sql = "INSERT INTO postlist (uuid, appid, userid, userip, time_post, process_status) VALUES
+                            (?,?,?,?,?,?)";
+        $dbConn->insert($sql, 'ssssss', $uuid, $appid, $userid, $userip, $time_post, $status);
+    } catch (Exception $e) {
+        $logger->error($e->getMessage());
+        $logger->error($e->getTraceAsString());
+        throw new MySQLException("Insert PostList Failed.", __EXCEPTION_DBER__);
+    }
 }
 
 function insertHistory()
@@ -345,9 +387,6 @@ function insertHistory()
     $uuid               = $_REQUEST['uuid'];
     $seqNo              = $_REQUEST['seq_no'];
     $status             = 1;
-    $appid              = "00";
-    $userid             = $_SERVER['REMOTE_ADDR'] ;
-    $userip             = $_SERVER['REMOTE_ADDR'] ;
     $time_post          = date("Y-m-d H:i:s", time());
     $filename_post      = rawurldecode($_FILES['file']['name']);
 //    $filename_post      = $_FILES['file']['name'];
@@ -361,9 +400,9 @@ function insertHistory()
     }
 
     try {
-        $sql = "INSERT INTO history (uuid, seq_no, process_status, appid, userid, userip, time_post, filename_post, filename_secure) VALUES
-                            (?,?,?,?,?,?,?,?,?)";
-        $dbConn->insert($sql, 'siissssss', $uuid, $seqNo, $status, $appid, $userid, $userip, $time_post, $filename_post, $filename_safe);
+        $sql = "INSERT INTO history (uuid, seq_no, process_status, time_post, filename_post, filename_secure) VALUES
+                            (?,?,?,?,?,?)";
+        $dbConn->insert($sql, 'siisss', $uuid, $seqNo, $status, $time_post, $filename_post, $filename_safe);
     } catch (Exception $e) {
         $logger->error($e->getMessage());
         $logger->error($e->getTraceAsString());
@@ -394,6 +433,7 @@ function buildReturnMsg(int $returnCode, string $returnMsg): String
 {
     $returnArray['returnCode'] = $returnCode;
     $returnArray['returnMsg']  = $returnMsg;
+    $returnArray['function'] = $_REQUEST['function'];
     return json_encode($returnArray);
 }
 
@@ -403,7 +443,7 @@ function verifyUserByUUID(string $uuid, string $inUser):bool
     global $logger;
 
     try {
-        $sql = "SELECT userid FROM history WHERE uuid = ? LIMIT 1";
+        $sql = "SELECT userid FROM postlist WHERE uuid = ? LIMIT 1";
         $stmt = $dbConn->select($sql, 's', $uuid);
         $stmt->bind_result($userId);
         $result = $stmt->fetch();

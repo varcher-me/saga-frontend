@@ -196,6 +196,35 @@
 				}
                 var uuid = guid();
 				console.log("uuid = " + uuid);
+
+                var formData = new FormData();
+                formData.append('function', 'initialize');
+                formData.append('uuid', uuid);
+                $.ajax({
+                    url: setting.url,
+                    type: 'POST',
+                    cache: false,
+                    data: formData,
+                    processData: false,
+                    contentType: false
+                }).done(function(res) {
+                    console.log(res);
+                    result=JSON.parse(res);
+                    if(0 == result.returnCode){
+                    }
+                    else
+                    {
+                        console.log(res);
+                        result=JSON.parse(res);
+                        alert("初始化失败，原因="+result.returnMsg);
+                        throw new Error("初始化失败，原因="+result.returnMsg);
+                    }
+                }).fail(function(res) {
+                    console.log(res);
+                    result=JSON.parse(res);
+                    alert("初始化失败，原因="+result.returnMsg)
+                    throw new Error("初始化失败，原因="+result.returnMsg);
+                });
 				fileArr.forEach(function (item, i) {
 					var upLoadSuccess = $('.img_box').eq(i).children('.up_load_success');
 
@@ -288,7 +317,7 @@ function saga_trasnform(uuid) {
         console.log(res);
         result=JSON.parse(res);
         if(0 == result.returnCode){
-            alert("转换成功")
+
         }
         else
         {

@@ -23,7 +23,7 @@
 			//	alert(fileName + '上传失败');
 			},
 			complete : function (uuid) {
-				alert('所有文件上传完毕，单击确定开始转换！批次号 = ' + uuid);
+				alert('所有文件上传完毕，单击确定开始转换！');
                 saga_trasnform(uuid);
                 window.location.href="file.php?function=showList&uuid="+uuid;
 			}
