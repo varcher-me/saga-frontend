@@ -21,7 +21,7 @@ if (isset($_REQUEST['function'])) {
 else{
     $function = "";
 }
-
+$logger->info("==========Transaction START for function {$function}==========");
 switch ($function) {
     case "initialize":
         $retMsg = initialize();
@@ -49,6 +49,8 @@ switch ($function) {
         break;
 }
 echo $retMsg;
+
+$logger->info("==========Transaction END for function {$function}==========");
 
 function initialize()
 {
@@ -306,7 +308,6 @@ function downloadFilePacked(string $uuid, array $fileList)
         }
         $zip->close();
     }
-    var_dump($file);
     if (!file_exists($file)) {
         throw new NoFilePackedException("No file packed.", __EXCEPTION_UNKNOWN__);
     }
