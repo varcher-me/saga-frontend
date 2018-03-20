@@ -150,16 +150,18 @@
 						//判断展示的文件类型
 						if(item.type.indexOf("image") > -1){
 							imgSrc = fr.result;
-						}else if(item.name.indexOf("rar") > -1){
-							imgSrc = src + 'rar.png';
-						}else if(item.name.indexOf("zip") > -1){
-							imgSrc = src + 'zip.png';
 						}else if(item.type.indexOf("text") > -1){
 							imgSrc = src + 'txt.png';
 						}else if(item.type.indexOf("word") > -1){
 							imgSrc = src + 'word.png';
+                        }else if(item.name.indexOf(".xls") > -1){
+                            imgSrc = src + 'excel.png';
+                        }else if(item.name.indexOf(".ppt") > -1){
+                            imgSrc = src + 'powerpoint.png';
+                        }else if(item.name.indexOf(".gd") > -1){
+                            imgSrc = src + 'gd.png';
 						}else{
-							imgSrc = src + 'file.png';
+							imgSrc = src + 'unknown.png';
 						}
 
 						//展示选择的文件
@@ -209,8 +211,51 @@
                     contentType: false
                 }).done(function(res) {
                     console.log(res);
-                    result=JSON.parse(res);
-                    if(0 == result.returnCode){
+                    var result = JSON.parse(res);
+                    if(0 === result.returnCode){
+                        fileArr.forEach(function (item, i) {
+                            var upLoadSuccess = $('.img_box').eq(i).children('.up_load_success');
+
+                            //防止重复上传
+                            if(upLoadSuccess.css('display') === 'block') return false;
+                            var formData = new FormData();
+                            formData.append('file', item);
+                            formData.append('uuid', uuid);
+                            formData.append('seq_no', i);
+                            formData.append('function', 'singleUpload');
+                            console.log("seq = " + i);
+                            $.ajax({
+                                url: setting.url,
+                                type: 'POST',
+                                cache: false,
+                                data: formData,
+                                processData: false,
+                                contentType: false
+                            }).done(function(res) {
+                                //上传成功图标
+                                console.log(res);
+                                result=JSON.parse(res);
+                                if(0 == result.returnCode){
+                                    upLoadSuccess.show();
+                                    //单个文件上传成功执行回调
+                                    setting.success(item.name);
+                                }
+                                else
+                                {	//upload fail show
+                                    //单个文件上传失败执行回调
+                                    setting.error(item.name);
+                                    alert("文件"+item.name+"上传失败，原因="+result.returnMsg)
+                                }
+                                //全部文件上传完成执行回调函数
+                                (i === (fileArr.length - 1)) && setting.complete(uuid);
+                            }).fail(function(res) {
+                                //单个文件上传失败执行回调
+                                setting.error(item.name);
+                                alert("文件"+item.name+"上传失败，原因=错误的服务器响应");
+
+                                (i === (fileArr.length - 1)) && setting.complete(uuid);
+                            });
+                        })
                     }
                     else
                     {
@@ -225,49 +270,6 @@
                     alert("初始化失败，原因="+result.returnMsg)
                     throw new Error("初始化失败，原因="+result.returnMsg);
                 });
-				fileArr.forEach(function (item, i) {
-					var upLoadSuccess = $('.img_box').eq(i).children('.up_load_success');
-
-					//防止重复上传
-					if(upLoadSuccess.css('display') === 'block') return false;
-					var formData = new FormData();
-					formData.append('file', item);
-					formData.append('uuid', uuid);
-					formData.append('seq_no', i);
-					formData.append('function', 'singleUpload');
-					console.log("seq = " + i);
-					$.ajax({
-					    url: setting.url,
-					    type: 'POST',
-					    cache: false,
-					    data: formData,
-					    processData: false,
-					    contentType: false
-					}).done(function(res) {
-						//上传成功图标
-						console.log(res);
-						result=JSON.parse(res);
-						if(0 == result.returnCode){
-                            upLoadSuccess.show();
-                            //单个文件上传成功执行回调
-                            setting.success(item.name);
-						}
-						else
-						{	//upload fail show
-                            //单个文件上传失败执行回调
-                            setting.error(item.name);
-                            alert("文件"+item.name+"上传失败，原因="+result.returnMsg)
-						}
-						//全部文件上传完成执行回调函数
-						(i === (fileArr.length - 1)) && setting.complete(uuid);
-					}).fail(function(res) {
-						//单个文件上传失败执行回调
-						setting.error(item.name);
-                        alert("文件"+item.name+"上传失败，原因=错误的服务器响应");
-
-						(i === (fileArr.length - 1)) && setting.complete(uuid);
-					});
-				})
 			}
 
 			//计算文件信息
